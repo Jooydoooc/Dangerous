@@ -1,0 +1,15 @@
+{
+  "name": "passive-voice-test",
+  "version": "1.0.0",
+  "description": "Passive Voice Test with Telegram Reporting",
+  "main": "api/telegram.js",
+  "scripts": {
+    "dev": "node api/telegram.js"
+  },
+  "dependencies": {
+    "node-fetch": "^2.6.7"
+  },
+  "engines": {
+    "node": "18.x"
+  }
+}
