@@ -1,5 +1,3 @@
-// No need to require node-fetch in Node.js 18+ as it's built-in
-
 module.exports = async (req, res) => {
     // Set CORS headers
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -16,32 +14,39 @@ module.exports = async (req, res) => {
     }
 
     try {
-        const { message, studentName, score, total } = req.body;
+        const { message, studentName, score, total, answers } = req.body;
 
         if (!message) {
             return res.status(400).json({ error: 'Message is required' });
         }
 
-        // Replace with your actual Telegram bot token and chat ID
-        const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || 'YOUR_BOT_TOKEN';
-        const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || 'YOUR_CHAT_ID';
+        // Get Telegram credentials from environment variables
+        const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+        const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
-        if (TELEGRAM_BOT_TOKEN === 'YOUR_BOT_TOKEN' || TELEGRAM_CHAT_ID === 'YOUR_CHAT_ID') {
-            console.log('Telegram credentials not configured, but test would work');
+        // Check if credentials are configured
+        if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
+            console.log('Telegram credentials not configured');
             return res.status(200).json({ 
                 success: true, 
-                message: 'Test mode: Results would be sent to Telegram with proper configuration',
+                message: 'Test completed (Telegram not configured)',
                 demo: true
             });
         }
 
+        // Format the message for Telegram
         const telegramMessage = `
 📝 *Passive Voice Test Result*
 
 *Student:* ${studentName}
 *Score:* ${score}/${total} (${((score/total)*100).toFixed(1)}%)
 
-${message}
+*Detailed Results:*
+
+${answers.map((answer, index) => {
+    const status = answer.isCorrect ? '✅' : '❌';
+    return `${status} *Q${index + 1}:* ${answer.tense}\n   Student: ${answer.selected}\n   Correct: ${answer.correct}`;
+}).join('\n\n')}
         `.trim();
 
         const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
@@ -54,7 +59,8 @@ ${message}
             body: JSON.stringify({
                 chat_id: TELEGRAM_CHAT_ID,
                 text: telegramMessage,
-                parse_mode: 'Markdown'
+                parse_mode: 'Markdown',
+                disable_web_page_preview: true
             })
         });
 
@@ -63,6 +69,7 @@ ${message}
         if (!data.ok) {
             console.error('Telegram API error:', data);
             return res.status(500).json({ 
+                success: false,
                 error: 'Failed to send message to Telegram',
                 details: data.description 
             });
@@ -76,6 +83,7 @@ ${message}
     } catch (error) {
         console.error('Error:', error);
         res.status(500).json({ 
+            success: false,
             error: 'Internal server error',
             details: error.message 
         });
