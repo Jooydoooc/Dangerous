@@ -187,6 +187,27 @@
             text-align: center;
         }
 
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 2s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
         @media (max-width: 768px) {
             body {
                 padding: 10px;
@@ -244,6 +265,11 @@
                 <div id="questionsContainer"></div>
                 <button type="submit" class="btn">Submit Test</button>
             </form>
+
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p>Submitting your test results...</p>
+            </div>
 
             <div id="result" class="result"></div>
         </div>
@@ -418,6 +444,8 @@
             document.getElementById('testForm').style.display = 'block';
 
             const container = document.getElementById('questionsContainer');
+            container.innerHTML = ''; // Clear any existing content
+            
             questions.forEach((q, index) => {
                 const questionDiv = document.createElement('div');
                 questionDiv.className = 'question';
@@ -445,6 +473,10 @@
             const answers = [];
             let score = 0;
 
+            // Show loading
+            document.getElementById('testForm').style.display = 'none';
+            document.getElementById('loading').style.display = 'block';
+
             // Calculate score and gather answers
             questions.forEach((q, index) => {
                 const selected = document.querySelector(`input[name="q${index}"]:checked`);
@@ -462,11 +494,16 @@
                 });
             });
 
-            // Display results
-            displayResults(score, answers);
-            
-            // Send to Telegram
-            await sendToTelegram(studentName, score, answers);
+            // Send to Telegram first, then display results
+            try {
+                await sendToTelegram(studentName, score, answers);
+            } catch (error) {
+                console.error('Failed to send to Telegram:', error);
+            } finally {
+                // Hide loading and show results
+                document.getElementById('loading').style.display = 'none';
+                displayResults(score, answers);
+            }
         }
 
         function displayResults(score, answers) {
@@ -505,16 +542,16 @@
         async function sendToTelegram(name, score, answers) {
             try {
                 // Format message for Telegram
-                let message = `📝 *New Test Submission*\\n\\n`;
-                message += `*Student:* ${name}\\n`;
-                message += `*Score:* ${score}/${questions.length}\\n\\n`;
-                message += `*Detailed Results:*\\n\\n`;
+                let message = `📝 *New Test Submission*\n\n`;
+                message += `*Student:* ${name}\n`;
+                message += `*Score:* ${score}/${questions.length}\n\n`;
+                message += `*Detailed Results:*\n\n`;
 
                 answers.forEach((answer, index) => {
                     const status = answer.isCorrect ? '✅' : '❌';
-                    message += `${status} *Q${index + 1}:* ${answer.tense}\\n`;
-                    message += `   Student: ${answer.selected}\\n`;
-                    message += `   Correct: ${answer.correct}\\n\\n`;
+                    message += `${status} *Q${index + 1}:* ${answer.tense}\n`;
+                    message += `   Student: ${answer.selected}\n`;
+                    message += `   Correct: ${answer.correct}\n\n`;
                 });
 
                 const response = await fetch('/api/telegram', {
@@ -526,15 +563,24 @@
                         message: message,
                         studentName: name,
                         score: score,
-                        total: questions.length
+                        total: questions.length,
+                        answers: answers
                     })
                 });
 
                 if (!response.ok) {
-                    console.error('Failed to send to Telegram');
+                    const errorText = await response.text();
+                    throw new Error(`HTTP error! status: ${response.status}, details: ${errorText}`);
                 }
+
+                const result = await response.json();
+                if (!result.success) {
+                    throw new Error(result.error || 'Unknown error from server');
+                }
+
             } catch (error) {
                 console.error('Error sending to Telegram:', error);
+                // Don't throw the error to the user, just log it
             }
         }
     </script>
