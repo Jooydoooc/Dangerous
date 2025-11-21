@@ -6,9 +6,7 @@
   "scripts": {
     "dev": "node api/telegram.js"
   },
-  "dependencies": {
-    "node-fetch": "^3.3.2"
-  },
+  "dependencies": {},
   "engines": {
     "node": "22.x"
   }
